@@ -17,6 +17,9 @@ for (fn in fnames) {
     )
   pm_df <- bind_rows(pm_df, df)
 }
+pm_df <- pm_df %>%
+	distinct()
+
 # tmp <- pm_df
 ubigeos <- readxl::read_excel(
   "misc/Poblacion Peru 2020 Dpto Prov Dist Final INEI-actualizado.xlsx",
