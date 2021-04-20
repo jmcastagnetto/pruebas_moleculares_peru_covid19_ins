@@ -1,24 +1,43 @@
 library(tidyverse)
-library(haven)
+library(vroom)
 
-fnames <- fs::dir_ls("orig/", glob = "*.csv")
+fnames <- fs::dir_ls("orig/", glob = "*.csv.gz")
+
+# cambio en separador
+sep_bar <- c(
+  "orig/pm10Abril2021.csv.gz",
+  "orig/pm25Marzo2021.csv.gz"
+)
 
 pm_df <- tibble()
 
 for (fn in fnames) {
-  df <- read_csv(
+  fn = fnames[1]
+  print(glue::glue("Procesando: {fn}"))
+  if (fn %in% sep_bar) {
+    sep = "|"
+  } else {
+    sep = ","
+  }
+  df <- vroom(
     fn,
+    delim = sep,
+    na = c("", "NULL", "*", "0001-01-01"),
     col_types = cols(.default = col_character())
   ) %>%
     janitor::clean_names() %>%
     mutate(
-      fechatomamuestra = lubridate::dmy(fechatomamuestra),
+      fechatomamuestra = lubridate::ymd(fechatomamuestra),
       edadpaciente_c = str_replace(edadpaciente_c, "años", "")
-    )
+    ) %>%
+    add_column(
+      src = str_remove(basename(fn), ".gz")
+    ) %>%
+    distinct() %>%
+    filter(!is.na(resultado))
+
   pm_df <- bind_rows(pm_df, df)
 }
-pm_df <- pm_df %>%
-	distinct()
 
 # tmp <- pm_df
 ubigeos <- readxl::read_excel(
@@ -58,23 +77,14 @@ pm_df <- pm_df %>%
   relocate(
     ubigeo,
     .before = dep_origen
-  )
+  ) %>%
+  distinct()
 
-# sin_ubigeo <- pm_df %>% filter(is.na(ubigeo))
+sin_ubigeo <- pm_df %>% filter(is.na(ubigeo))
 
 saveRDS(
   pm_df,
   file = "proc/pm_covid19_ins_peru.rds"
-)
-
-write_dta(
-  pm_df,
-  path = "proc/pm_covid19_ins_peru.dta"
-)
-
-R.utils::gzip(
-  filename = "proc/pm_covid19_ins_peru.dta",
-  overwrite = TRUE
 )
 
 write_csv(
@@ -85,10 +95,10 @@ write_csv(
 pm_counts_df <- pm_df %>%
   group_by(
     fechatomamuestra,
-    tipo_muestra,
+    tipomuestra,
     resultado,
     edadpaciente_c,
-    sexo_paciente,
+    sexopaciente,
     institucion,
     ubigeo,
     dep_origen,
